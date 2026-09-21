@@ -697,7 +697,7 @@ def pick_assets(traded_picks, teams_by_id, season: int, rounds: int,
                 if owner not in teams_by_id:
                     owner = orig_rid
                 # worse team -> earlier pick -> more valuable
-                slot_frac = 0.5 - 0.42 * orig_team.contend          # 0.08 .. 0.92
+                slot_frac = 0.5 + 0.42 * orig_team.contend          # 0.08 .. 0.92
                 tier = "early" if slot_frac < 0.34 else ("mid" if slot_frac < 0.67 else "late")
                 disc = PICK_SEASON_DISCOUNT.get(yr - season, 0.5)
                 val = rookie_anchor * PICK_TABLE.get((rd, tier), 0.02) * disc
@@ -749,8 +749,14 @@ def value_everything(pool: dict[str, Asset], scoring: dict, proj: dict,
         stats = proj.get(a.key)
         if stats:
             pts = score_stats(stats, scoring)
-            games = stats.get("gp") or stats.get("gms_active") or 17
-            a.ppg = pts / max(1.0, float(games)) if pts > 3 * games else pts / 17.0
+            games = float(stats.get("gp") or stats.get("gms_active") or 17)
+            # Sleeper's team-DEF projection rows carry full-season totals but
+            # report gp = 1, so dividing by gp reads a whole season as a single
+            # game and a defense comes out around 90 ppg. Trust gp only when it
+            # is a plausible games-played count.
+            if games < 4:
+                games = 17.0
+            a.ppg = pts / max(1.0, games) if pts > 3 * games else pts / 17.0
             if a.ppg <= 0:
                 a.ppg = pts / 17.0
         else:
